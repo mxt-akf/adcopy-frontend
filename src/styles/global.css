@@ -1,0 +1,21 @@
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c0c4cc;
+}
+
+.el-card {
+  --el-card-border-radius: 8px;
+}
+.el-button--primary {
+  --el-button-hover-bg-color: #66b1ff;
+}
