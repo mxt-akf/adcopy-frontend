@@ -31,13 +31,20 @@
         <template v-for="field in sceneFields" :key="field.key">
           <el-form-item v-if="field.type === 'radio'" :label="field.label">
             <el-radio-group v-model="extraFields[field.key]">
-              <el-radio-button v-for="opt in field.options" :key="opt" :value="opt">
+              <el-radio-button
+                v-for="opt in field.options"
+                :key="opt"
+                :value="opt"
+              >
                 {{ opt }}
               </el-radio-button>
             </el-radio-group>
           </el-form-item>
 
-          <el-form-item v-else-if="field.type === 'textarea'" :label="field.label">
+          <el-form-item
+            v-else-if="field.type === 'textarea'"
+            :label="field.label"
+          >
             <el-input
               v-model="extraFields[field.key]"
               type="textarea"
@@ -49,7 +56,10 @@
           </el-form-item>
 
           <el-form-item v-else :label="field.label">
-            <el-input v-model="extraFields[field.key]" :placeholder="field.placeholder" />
+            <el-input
+              v-model="extraFields[field.key]"
+              :placeholder="field.placeholder"
+            />
           </el-form-item>
         </template>
       </template>
@@ -66,6 +76,13 @@
         </el-radio-group>
       </el-form-item>
 
+      <el-form-item label="输出语言">
+        <el-input
+          v-model="form.language"
+          placeholder="例：英语、中文、日语、西班牙语"
+        />
+      </el-form-item>
+
       <el-button
         type="primary"
         :loading="loading"
@@ -73,53 +90,57 @@
         style="width: 100%"
         @click="handleGenerate"
       >
-        {{ loading ? '生成中...' : '一键裂变' }}
+        {{ loading ? "生成中..." : "一键裂变" }}
       </el-button>
     </el-form>
   </section>
 </template>
 
 <script setup>
-import { reactive, computed, watch } from 'vue'
-import { ArrowRight } from '@element-plus/icons-vue'
-import { getSceneConfig } from '@/data/scenes'
+import { reactive, computed, watch } from "vue";
+import { ArrowRight } from "@element-plus/icons-vue";
+import { getSceneConfig } from "@/data/scenes";
 
 const props = defineProps({
   selectedScene: { type: Object, default: null },
   loading: Boolean,
-})
+});
 
-const emit = defineEmits(['open-drawer', 'generate'])
+const emit = defineEmits(["open-drawer", "generate"]);
 
-const form = reactive({ count: 10, tone: '活泼' })
-const extraFields = reactive({})
+const form = reactive({ count: 10, tone: "活泼", language: "中文" });
+const extraFields = reactive({});
 
 const sceneFields = computed(() => {
-  if (!props.selectedScene) return []
-  return getSceneConfig(props.selectedScene.platId, props.selectedScene.scene)?.fields ?? []
-})
+  if (!props.selectedScene) return [];
+  return (
+    getSceneConfig(props.selectedScene.platId, props.selectedScene.scene)
+      ?.fields ?? []
+  );
+});
 
 // 必填字段全部有值才可提交
-const canGenerate = computed(() =>
-  sceneFields.value.length > 0 &&
-  sceneFields.value
-    .filter(f => f.required)
-    .every(f => extraFields[f.key]?.trim())
-)
+const canGenerate = computed(
+  () =>
+    sceneFields.value.length > 0 &&
+    sceneFields.value
+      .filter((f) => f.required)
+      .every((f) => extraFields[f.key]?.trim()),
+);
 
 // 切换场景清空
 watch(
   () => props.selectedScene?.scene,
-  () => Object.keys(extraFields).forEach(k => delete extraFields[k])
-)
+  () => Object.keys(extraFields).forEach((k) => delete extraFields[k]),
+);
 
 function handleGenerate() {
-  emit('generate', {
+  emit("generate", {
     ...form,
     platName: props.selectedScene?.platName,
     scene: props.selectedScene?.scene,
     extraFields: { ...extraFields },
-  })
+  });
 }
 </script>
 
