@@ -13,6 +13,31 @@
       >
         {{ sensitiveCount }} 条含敏感词
       </el-tag>
+
+      <!-- 高风险场景提示 + 批量检测入口 -->
+      <template v-if="results.length">
+        <el-tooltip
+          v-if="isHighRisk"
+          content="此场景建议检测违禁词后再投放"
+          placement="top"
+        >
+          <el-tag
+            type="warning"
+            size="small"
+            style="margin-left: 6px; cursor: default"
+          >
+            高风险场景
+          </el-tag>
+        </el-tooltip>
+        <el-button
+          size="small"
+          :loading="detecting"
+          style="margin-left: auto"
+          @click="handleDetectAll"
+        >
+          {{ detecting ? "检测中..." : "检测全部违禁词" }}
+        </el-button>
+      </template>
     </h2>
 
     <el-empty
@@ -41,13 +66,23 @@
       >
         <div class="result-meta">
           <span class="result-index">#{{ item.index }}</span>
-          <el-tag v-if="item.sensitiveWords?.length" type="danger" size="small">
-            含敏感词 {{ item.sensitiveWords.length }}
-          </el-tag>
-          <el-tag v-else type="success" size="small">安全</el-tag>
+          <template v-if="item.detected">
+            <el-tag
+              v-if="item.sensitiveWords?.length"
+              type="danger"
+              size="small"
+            >
+              含敏感词 {{ item.sensitiveWords.length }}
+            </el-tag>
+            <el-tag v-else type="success" size="small">安全</el-tag>
+          </template>
+          <el-tag v-else size="small" type="info">未检测</el-tag>
         </div>
 
-        <p class="result-text" v-html="highlightText(item.text, item.sensitiveWords)" />
+        <p
+          class="result-text"
+          v-html="highlightText(item.text, item.sensitiveWords)"
+        />
 
         <div v-if="item.sensitiveWords?.length" class="sensitive-tags">
           <span class="sensitive-label">违禁词：</span>
@@ -63,7 +98,18 @@
         </div>
 
         <div class="result-actions">
-          <el-button link size="small" @click="copyText(item.text)">复制</el-button>
+          <!-- 单条检测 -->
+          <el-button
+            link
+            size="small"
+            :loading="item.detecting"
+            @click="handleDetectOne(item)"
+          >
+            检测违禁词
+          </el-button>
+          <el-button link size="small" @click="copyText(item.text)"
+            >复制</el-button
+          >
         </div>
       </el-card>
     </transition-group>
@@ -71,22 +117,73 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, ref } from "vue";
+import { ElMessage } from "element-plus";
+import { detectCopy } from "@/api/copy";
+import { useSceneConfig } from "@/composables/useSceneConfig";
 
 const props = defineProps({
   results: { type: Array, default: () => [] },
   loading: Boolean,
   pendingCount: { type: Number, default: 5 },
-})
+  selectedScene: { type: Object, default: null },
+});
 
-const sensitiveCount = computed(() =>
-  props.results.filter(item => item.sensitiveWords?.length > 0).length,
-)
+const { getRiskLevel } = useSceneConfig();
+
+const detecting = ref(false);
+
+const isHighRisk = computed(() => {
+  if (!props.selectedScene) return false;
+  return (
+    getRiskLevel(props.selectedScene.platId, props.selectedScene.scene) ===
+    "high"
+  );
+});
+
+const sensitiveCount = computed(
+  () => props.results.filter((item) => item.sensitiveWords?.length > 0).length,
+);
+
+// 批量检测全部
+async function handleDetectAll() {
+  if (!props.results.length || detecting.value) return;
+  detecting.value = true;
+  try {
+    const texts = props.results.map((item) => item.text);
+    const res = await detectCopy(texts, props.selectedScene?.platName);
+    const detectionMap = Object.fromEntries(
+      (res.data?.items ?? []).map((d) => [d.index, d.sensitiveWords]),
+    );
+    props.results.forEach((item) => {
+      item.sensitiveWords = detectionMap[item.index] ?? [];
+      item.detected = true;
+    });
+  } finally {
+    detecting.value = false;
+  }
+}
+
+// 单条检测
+async function handleDetectOne(item) {
+  if (item.detecting) return;
+  item.detecting = true;
+  try {
+    const res = await detectCopy([item.text], props.selectedScene?.platName);
+    const first = res.data?.items?.[0];
+    item.sensitiveWords = first?.sensitiveWords ?? [];
+    item.detected = true;
+  } finally {
+    item.detecting = false;
+  }
+}
 
 function highlightText(text, sensitiveWords) {
-  if (!sensitiveWords?.length) return escapeHtml(text)
   let result = escapeHtml(text)
+    .replace(/\n+/g, '<br>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')  // 加这行
+
+  if (!sensitiveWords?.length) return result
   sensitiveWords.forEach(sw => {
     const escaped = escapeHtml(sw.word)
     result = result.replace(
@@ -99,15 +196,15 @@ function highlightText(text, sensitiveWords) {
 
 function escapeHtml(str) {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function copyText(text) {
-  navigator.clipboard.writeText(text)
-  ElMessage.success('已复制')
+  navigator.clipboard.writeText(text);
+  ElMessage.success("已复制");
 }
 </script>
 
@@ -149,7 +246,7 @@ function copyText(text) {
 .result-text {
   font-size: 14px;
   color: #303133;
-  line-height: 1.6;
+  line-height: 1.9; /* 原来是 1.6 */
   margin: 0;
 }
 .sensitive-tags {
@@ -167,6 +264,7 @@ function copyText(text) {
   margin-top: 8px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 .fade-enter-active {
   transition: all 0.3s ease;

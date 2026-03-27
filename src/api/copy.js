@@ -1,11 +1,8 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-const http = axios.create({
-  timeout: 60000,
-})
+const http = axios.create({ timeout: 60000 })
 
-// 响应拦截：统一处理错误提示
 http.interceptors.response.use(
   res => res.data,
   err => {
@@ -15,5 +12,7 @@ http.interceptors.response.use(
   }
 )
 
-export const generateCopy = (data) =>
-  http.post('/api/copy/generate', data)
+export const generateCopy = (data) => http.post('/api/copy/generate', data)
+
+export const detectCopy = (texts, platName) =>
+  http.post('/api/copy/detect', { texts, platName })

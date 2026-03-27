@@ -26,7 +26,7 @@
         </div>
       </el-form-item>
 
-      <!-- 全动态字段 -->
+      <!-- 动态字段 -->
       <template v-if="sceneFields.length">
         <template v-for="field in sceneFields" :key="field.key">
           <el-form-item v-if="field.type === 'radio'" :label="field.label">
@@ -66,20 +66,49 @@
 
       <el-form-item label="生成数量">
         <el-slider v-model="form.count" :min="1" :max="20" show-input />
+        <p
+          v-if="sceneConfig?.countHint"
+          style="
+            font-size: 12px;
+            color: var(--el-text-color-secondary);
+            margin-top: 6px;
+          "
+        >
+          {{ sceneConfig.countHint }}
+        </p>
       </el-form-item>
 
+      <!-- 语气 -->
       <el-form-item label="文案语气">
-        <el-radio-group v-model="form.tone">
-          <el-radio-button value="活泼">活泼</el-radio-button>
-          <el-radio-button value="专业">专业</el-radio-button>
-          <el-radio-button value="紧迫">紧迫</el-radio-button>
-        </el-radio-group>
+        <el-select
+          v-model="form.tone"
+          style="width: 100%"
+          @change="onToneChange"
+        >
+          <el-option v-for="t in TONES" :key="t" :label="t" :value="t" />
+        </el-select>
+        <el-input
+          v-if="form.tone === '自定义'"
+          v-model="form.customTone"
+          placeholder="请输入自定义语气，例：俏皮、煽情、学术"
+          style="margin-top: 8px"
+        />
       </el-form-item>
 
+      <!-- 语言 -->
       <el-form-item label="输出语言">
-        <el-input
+        <el-select
           v-model="form.language"
-          placeholder="例：英语、中文、日语、西班牙语"
+          style="width: 100%"
+          @change="onLanguageChange"
+        >
+          <el-option v-for="l in LANGUAGES" :key="l" :label="l" :value="l" />
+        </el-select>
+        <el-input
+          v-if="form.language === '自定义'"
+          v-model="form.customLanguage"
+          placeholder="请输入语言，例：泰语、荷兰语"
+          style="margin-top: 8px"
         />
       </el-form-item>
 
@@ -99,44 +128,97 @@
 <script setup>
 import { reactive, computed, watch } from "vue";
 import { ArrowRight } from "@element-plus/icons-vue";
-import { getSceneConfig } from "@/data/scenes";
+import { useSceneConfig } from "@/composables/useSceneConfig";
+
+const TONES = [
+  "专业的",
+  "幽默的",
+  "兴奋的",
+  "机智的",
+  "有趣的",
+  "丰富的",
+  "温和的",
+  "委婉的",
+  "礼貌的",
+  "精简的",
+  "口语化的",
+  "有说服力的",
+  "自定义",
+];
+
+const LANGUAGES = [
+  "中文",
+  "英语",
+  "日语",
+  "韩语",
+  "法语",
+  "德语",
+  "西班牙语",
+  "葡萄牙语",
+  "阿拉伯语",
+  "自定义",
+];
 
 const props = defineProps({
   selectedScene: { type: Object, default: null },
   loading: Boolean,
 });
-
 const emit = defineEmits(["open-drawer", "generate"]);
 
-const form = reactive({ count: 10, tone: "活泼", language: "中文" });
+const { getFields, getConfig  } = useSceneConfig();
+
+const form = reactive({
+  count: 10,
+  tone: "专业的",
+  customTone: "",
+  language: "中文",
+  customLanguage: "",
+});
+
 const extraFields = reactive({});
 
 const sceneFields = computed(() => {
   if (!props.selectedScene) return [];
-  return (
-    getSceneConfig(props.selectedScene.platId, props.selectedScene.scene)
-      ?.fields ?? []
-  );
+  return getFields(props.selectedScene.platId, props.selectedScene.scene);
 });
 
-// 必填字段全部有值才可提交
-const canGenerate = computed(
-  () =>
-    sceneFields.value.length > 0 &&
-    sceneFields.value
-      .filter((f) => f.required)
-      .every((f) => extraFields[f.key]?.trim()),
+const sceneConfig = computed(() =>
+  props.selectedScene
+    ? getConfig(props.selectedScene.platId, props.selectedScene.scene)
+    : null,
 );
 
-// 切换场景清空
+const canGenerate = computed(() => {
+  if (sceneFields.value.length === 0) return false;
+  const requiredOk = sceneFields.value
+    .filter((f) => f.required)
+    .every((f) => extraFields[f.key]?.trim());
+  const toneOk = form.tone !== "自定义" || form.customTone.trim();
+  const langOk = form.language !== "自定义" || form.customLanguage.trim();
+  return requiredOk && toneOk && langOk;
+});
+
+function onToneChange(val) {
+  if (val !== "自定义") form.customTone = "";
+}
+
+function onLanguageChange(val) {
+  if (val !== "自定义") form.customLanguage = "";
+}
+
 watch(
   () => props.selectedScene?.scene,
-  () => Object.keys(extraFields).forEach((k) => delete extraFields[k]),
+  () => {
+    Object.keys(extraFields).forEach((k) => delete extraFields[k]);
+  },
 );
 
 function handleGenerate() {
   emit("generate", {
-    ...form,
+    count: form.count,
+    tone: form.tone === "自定义" ? form.customTone.trim() : form.tone,
+    language:
+      form.language === "自定义" ? form.customLanguage.trim() : form.language,
     platName: props.selectedScene?.platName,
     scene: props.selectedScene?.scene,
     extraFields: { ...extraFields },
@@ -151,16 +233,19 @@ function handleGenerate() {
   padding: 24px;
   border: 1px solid #e4e7ed;
 }
+
 .left-panel {
   width: 380px;
   flex-shrink: 0;
 }
+
 .panel-title {
   font-size: 15px;
   font-weight: 600;
   color: #303133;
   margin-bottom: 20px;
 }
+
 .scene-trigger {
   display: flex;
   align-items: center;
@@ -174,9 +259,11 @@ function handleGenerate() {
   box-sizing: border-box;
   transition: border-color 0.2s;
 }
+
 .scene-trigger:hover {
   border-color: var(--el-color-primary);
 }
+
 .scene-name {
   flex: 1;
   font-size: 13px;
@@ -186,14 +273,22 @@ function handleGenerate() {
   text-overflow: ellipsis;
   min-width: 0;
 }
+
 .scene-placeholder {
   flex: 1;
   font-size: 13px;
   color: var(--el-text-color-placeholder);
 }
+
 .scene-arrow {
   color: var(--el-text-color-placeholder);
   flex-shrink: 0;
   font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .left-panel {
+    width: 100%;
+  }
 }
 </style>
