@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { ElMessage } from "element-plus";
 import { getScenes } from "@/api/scenes";
 import { platformMeta } from "@/data/scenes";
 
@@ -13,11 +14,14 @@ export function useSceneConfig() {
     loading.value = true;
     try {
       const res = await getScenes();
-      platforms.value = (res.data ?? []).map((plat) => ({
+      const list = Array.isArray(res) ? res : (res.data ?? []);
+      platforms.value = list.map((plat) => ({
         ...plat,
         ...(platformMeta[plat.id] ?? {}),
       }));
       loaded.value = true;
+    } catch {
+      ElMessage.error('场景配置加载失败，请刷新页面重试')
     } finally {
       loading.value = false;
     }

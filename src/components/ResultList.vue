@@ -181,13 +181,14 @@ async function handleDetectOne(item) {
 function highlightText(text, sensitiveWords) {
   let result = escapeHtml(text)
     .replace(/\n+/g, '<br>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')  // 加这行
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 
   if (!sensitiveWords?.length) return result
   sensitiveWords.forEach(sw => {
     const escaped = escapeHtml(sw.word)
+    const pattern = escapeRegExp(escaped)
     result = result.replace(
-      new RegExp(escaped, 'gi'),
+      new RegExp(pattern, 'gi'),
       `<mark class="highlight">${escaped}</mark>`,
     )
   })
@@ -202,9 +203,17 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function copyText(text) {
-  navigator.clipboard.writeText(text);
-  ElMessage.success("已复制");
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success("已复制")
+  } catch {
+    ElMessage.error("复制失败，请手动复制")
+  }
 }
 </script>
 

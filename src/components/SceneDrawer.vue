@@ -148,6 +148,7 @@ function handleChipClick(scene) {
 function handleConfirm() {
   if (!tempSelected.value) return
   const plat = getPlatformById(tempSelected.value.platId)
+  if (!plat) return
   emit('confirm', {
     platId: tempSelected.value.platId,
     platName: plat.name,
